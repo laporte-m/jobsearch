@@ -1,20 +1,23 @@
 import sqlite3
 import sys
+from datetime import datetime as dt
 
 def try_sqlite3(func):
     ''' Decorator to handle sqlite3 exceptions '''
     def wrapper(*args, **kwargs):
         try:
-            func(*args, **kwargs)
+            return func(*args, **kwargs)
 
         except sqlite3.Error as e:
             print("Error {}:".format(e.args[0]))
             sys.exit(1)
 
+    return wrapper
+
 class Database(object):
 
     def __init__(self, db_file, table='Main', fields=("Name TEXT",)):
-    ''' One initial table may be specified '''
+        ''' One initial table may be specified '''
         self.conn = self.db_init(db_file)
         self.table_init(self.conn, table, fields)
 
@@ -25,14 +28,13 @@ class Database(object):
     @staticmethod
     @try_sqlite3
     def db_init(db_file):
-    ''' Return connection to database '''
-        conn = sqlite3.connect(db_file)
-        return conn
+        ''' Return connection to database '''
+        return sqlite3.connect(db_file)
 
     @staticmethod
     @try_sqlite3
     def table_init(conn, table, fields=("Name TEXT",)):
-    ''' Create table if it doesn't exist '''
+        ''' Create table if it doesn't exist '''
         with conn:
             crs = conn.cursor()
             fields_ = ', '.join(fields)
@@ -42,22 +44,28 @@ class Database(object):
     @staticmethod
     @try_sqlite3
     def table_info(db, table):
-        crs = db.conn.cursor
+        crs = db.conn.cursor()
         crs.execute('PRAGMA table_info({})'.format(table))
         return crs.fetchall()
     
+    @classmethod
+    def table_columns(cls, db, table):
+        ''' Return names of columns in table '''
+        return tuple(c[1] for c in cls.table_info(db, table))
+
     @try_sqlite3
     def add_app(self, table, values):
-    ''' Add application entry to database '''
+        ''' Add application entry to database '''
         with self.conn:
             crs = self.conn.cursor()
+            names = self.table_columns(self, table)[1:]
+            fields = ', '.join(names)
+            hold = ', '.join(['?'] * len(names))
             statement = 'INSERT INTO {}({}) VALUES({})'
-            fields = ', '.join(list(self.fields[table].keys()))
-            hold = ', '.join(['?'] * len(values))
             crs.execute(statement.format(table, fields, hold), values)
 
     def get_entry(self, table, id=None):
-    ''' Return entry with given Id, else return all entries '''
+        ''' Return entry with given Id, else return all entries '''
         with self.conn:
             crs = self.conn.cursor()
             if id:
@@ -84,19 +92,27 @@ if __name__ == '__main__':
     fields = ("Date TEXT", "Deadline TEXT", "Org TEXT", "Source TEXT", 
               "Contact TEXT", "Title TEXT", "Type TEXT", "Pay REAL", "Note TEXT")
 
+    datetime_fmt = "%Y/%m/%d %H:%M:%S"
+
     db = Database(db_file, table, fields)
     count = 0
 
     while input("Add new entry? (Y/n)").lower() in ['y', '']:
 
         values = ()
-        table_info = Database.table_info(db, table)
-        names = tuple(i[1] for i in table_info)
-
+        names = Database.table_columns(db, table)
+        print(names)
         print("Enter details for new entry:")
         for i, name in enumerate(names):
-            if i: 
-                value = input('{}: '.format(name[0]))
+            if i: # 'Id' has i==0 and is auto incremented 
+                if name == "Date":
+                    now = dt.now().strftime(datetime_fmt)
+                    value = input('{} (default: \"{}\"): '.format(name, now))
+                    if not value:
+                        value = now
+                else:
+                    value = input('{}: '.format(name))
+
                 if value.lower() == 'exit': 
                     values += (value.lower(),)
                     break
@@ -110,6 +126,7 @@ if __name__ == '__main__':
             count += 1
 
     print("{} new entries added to table {} in {}".format(count, table, db_file))
+    print("The table now contains {} entries".format(len(db.get_entry(table))))
 
     db.disconnect()
 
