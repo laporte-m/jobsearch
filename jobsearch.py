@@ -1,5 +1,6 @@
 import sqlite3
 import sys
+import os
 from datetime import datetime as dt
 
 def try_sqlite3(func):
@@ -16,7 +17,7 @@ def try_sqlite3(func):
 
 class Database(object):
 
-    def __init__(self, db_file, table='Main', fields=("Name TEXT",)):
+    def __init__(self, db_file, table='Apps', fields=("Name TEXT",)):
         ''' One initial table may be specified '''
         self.conn = self.db_init(db_file)
         self.table_init(self.conn, table, fields)
@@ -78,8 +79,12 @@ class Database(object):
             
             return crs.fetchall()            
 
+def write_blob(blob, filetype="pdf"):
+    ''' Write binary data (blob) to file '''
+    with open("blob.{}".format(filetype), 'wb') as f:
+        f.write(blob)
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         db_file = sys.argv[1]
     except IndexError:
@@ -90,7 +95,8 @@ if __name__ == '__main__':
         table = "Apps"
 
     fields = ("Date TEXT", "Deadline TEXT", "Org TEXT", "Source TEXT", 
-              "Contact TEXT", "Title TEXT", "Type TEXT", "Pay REAL", "Note TEXT")
+              "Contact TEXT", "Title TEXT", "Type TEXT", "Pay REAL", 
+              "Note TEXT", "File BLOB")
 
     datetime_fmt = "%Y/%m/%d %H:%M:%S"
 
@@ -101,19 +107,42 @@ if __name__ == '__main__':
 
         values = ()
         names = Database.table_columns(db, table)
-        print(names)
+
         print("Enter details for new entry:")
         for i, name in enumerate(names):
+
             if i: # 'Id' has i==0 and is auto incremented 
+
                 if name == "Date":
                     now = dt.now().strftime(datetime_fmt)
-                    value = input('{} (default: \"{}\"): '.format(name, now))
+                    value = input('Date (default: \"{}\"): '.format(now))
                     if not value:
                         value = now
+
+                elif name == "File":
+
+                    filename = input('File (D for \"../cv/LaporteM.pdf\"):')
+                    if filename == "D":
+                        filename = "../cv/LaporteM.pdf"
+
+                    elif filename.lower() == 'exit':
+                        value = filename.lower()
+                        break
+
+                    if filename:
+                        try:
+                            with open(filename, 'rb') as f:
+                                blob = f.read()
+                        except FileNotFoundError:
+                            print("Invalid file!")
+                    else:
+                        blob = b''
+                    value = sqlite3.Binary(blob)
+
                 else:
                     value = input('{}: '.format(name))
 
-                if value.lower() == 'exit': 
+                if name != "File" and value.lower() == 'exit': 
                     values += (value.lower(),)
                     break
                 else:
