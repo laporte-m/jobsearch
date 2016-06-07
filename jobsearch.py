@@ -1,10 +1,13 @@
+"""Basic command-line database manager, intended for job application records.
+"""
+
 import sqlite3
 import sys
 import os
 from datetime import datetime as dt
 
 def try_sqlite3(func):
-    ''' Decorator to handle sqlite3 exceptions '''
+    """ Decorator to handle sqlite3 exceptions. """
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -18,7 +21,6 @@ def try_sqlite3(func):
 class Database(object):
 
     def __init__(self, db_file, table='Apps', fields=("Name TEXT",)):
-        ''' One initial table may be specified '''
         self.conn = self.db_init(db_file)
         self.table_init(self.conn, table, fields)
 
@@ -29,18 +31,18 @@ class Database(object):
     @staticmethod
     @try_sqlite3
     def db_init(db_file):
-        ''' Return connection to database '''
+        """ Return connection to database. """
         return sqlite3.connect(db_file)
 
     @staticmethod
     @try_sqlite3
     def table_init(conn, table, fields=("Name TEXT",)):
-        ''' Create table if it doesn't exist '''
+        """ Create table if it doesn't exist. """
         with conn:
             crs = conn.cursor()
             fields_ = ', '.join(fields)
-            crs.execute('''CREATE TABLE IF NOT EXISTS {}
-                           (Id INTEGER PRIMARY KEY, {})'''.format(table, fields_))
+            crs.execute("""CREATE TABLE IF NOT EXISTS {}
+                           (Id INTEGER PRIMARY KEY, {})""".format(table, fields_))
 
     @staticmethod
     @try_sqlite3
@@ -48,15 +50,15 @@ class Database(object):
         crs = db.conn.cursor()
         crs.execute('PRAGMA table_info({})'.format(table))
         return crs.fetchall()
-    
+
     @classmethod
     def table_columns(cls, db, table):
-        ''' Return names of columns in table '''
+        """ Return names of columns in table. """
         return tuple(c[1] for c in cls.table_info(db, table))
 
     @try_sqlite3
     def add_app(self, table, values):
-        ''' Add application entry to database '''
+        """ Add application entry to database. """
         with self.conn:
             crs = self.conn.cursor()
             names = self.table_columns(self, table)[1:]
@@ -66,7 +68,7 @@ class Database(object):
             crs.execute(statement.format(table, fields, hold), values)
 
     def get_entry(self, table, id=None):
-        ''' Return entry with given Id, else return all entries '''
+        """ Return entry with given Id, else return all entries. """
         with self.conn:
             crs = self.conn.cursor()
             if id:
@@ -76,11 +78,11 @@ class Database(object):
                     print("Invalid entry Id!")
             else:
                 crs.execute('SELECT * FROM Apps')
-            
-            return crs.fetchall()            
+
+            return crs.fetchall()
 
 def write_blob(blob, filetype="pdf"):
-    ''' Write binary data (blob) to file '''
+    """ Write binary data (blob) to file. """
     with open("blob.{}".format(filetype), 'wb') as f:
         f.write(blob)
 
@@ -94,8 +96,8 @@ if __name__ == "__main__":
     except IndexError:
         table = "Apps"
 
-    fields = ("Date TEXT", "Deadline TEXT", "Org TEXT", "Source TEXT", 
-              "Contact TEXT", "Title TEXT", "Type TEXT", "Pay REAL", 
+    fields = ("Date TEXT", "Deadline TEXT", "Org TEXT", "Source TEXT",
+              "Contact TEXT", "Title TEXT", "Type TEXT", "Pay REAL",
               "Note TEXT", "File BLOB")
 
     datetime_fmt = "%Y/%m/%d %H:%M:%S"
@@ -111,7 +113,7 @@ if __name__ == "__main__":
         print("Enter details for new entry:")
         for i, name in enumerate(names):
 
-            if i: # 'Id' has i==0 and is auto incremented 
+            if i: # 'Id' has i==0 and is auto incremented
 
                 if name == "Date":
                     now = dt.now().strftime(datetime_fmt)
@@ -142,7 +144,7 @@ if __name__ == "__main__":
                 else:
                     value = input('{}: '.format(name))
 
-                if name != "File" and value.lower() == 'exit': 
+                if name != "File" and value.lower() == 'exit':
                     values += (value.lower(),)
                     break
                 else:
@@ -158,6 +160,3 @@ if __name__ == "__main__":
     print("The table now contains {} entries".format(len(db.get_entry(table))))
 
     db.disconnect()
-
-        
-    
